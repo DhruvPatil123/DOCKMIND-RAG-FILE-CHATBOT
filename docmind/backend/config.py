@@ -7,7 +7,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "https://api.olama.cloud/v1")
+OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "https://api.ollama.cloud/v1")
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "")
 PINECONE_INDEX = os.getenv("PINECONE_INDEX", "")
