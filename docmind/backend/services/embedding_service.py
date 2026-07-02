@@ -23,15 +23,28 @@ class EmbeddingService:
         embeddings: List[List[float]] = []
         with httpx.Client(timeout=60.0) as client:
             for text in texts:
-                payload = {"model": self.model, "input": text}
+                # Determine endpoint and payload based on API URL
+                if "/v1" in self.api_url:
+                    payload = {"model": self.model, "input": text}
+                    endpoint = "/embeddings"
+                else:
+                    payload = {"model": self.model, "prompt": text}
+                    endpoint = "/api/embeddings"
                 resp = client.post(
-                    f"{self.api_url}/embeddings",
+                    f"{self.api_url}{endpoint}",
                     json=payload,
                     headers=self._headers(),
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                embeddings.append(data["embedding"])
+                if "embedding" in data:
+                    embeddings.append(data["embedding"])
+                elif "data" in data and len(data["data"]) > 0:
+                    embeddings.append(data["data"][0]["embedding"])
+                elif "embeddings" in data and len(data["embeddings"]) > 0:
+                    embeddings.append(data["embeddings"][0])
+                else:
+                    raise KeyError(f"Unexpected API response format: {data}")
         return embeddings
 
     def embed_query(self, text: str) -> List[float]:

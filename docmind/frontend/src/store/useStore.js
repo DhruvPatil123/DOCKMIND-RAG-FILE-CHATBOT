@@ -6,6 +6,22 @@ import {
   streamChat,
 } from "../api";
 
+const readStoredState = (key, fallback) => {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writeStoredState = (key, value) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  }
+};
+
 export const useStore = create((set, get) => ({
   documents: [],
   activeDocId: null,
@@ -14,10 +30,93 @@ export const useStore = create((set, get) => ({
   processingState: "idle",
   processingSteps: [],
   error: null,
+  themeMode: readStoredState("docmind-theme", "dark"),
+  workspaceMode: readStoredState("docmind-workspace", "personal"),
+  workspaceMembers: 3,
+  documentSearchQuery: "",
+  compareDocA: null,
+  compareDocB: null,
+  savedConversations: readStoredState("docmind-conversations", []),
+  activeConversationId: null,
 
   getActiveMessages: () => {
     const { activeDocId, messages } = get();
     return activeDocId ? messages[activeDocId] || [] : [];
+  },
+
+  setThemeMode: (mode) => {
+    writeStoredState("docmind-theme", mode);
+    set({ themeMode: mode });
+  },
+
+  setWorkspaceMode: (mode) => {
+    writeStoredState("docmind-workspace", mode);
+    set({ workspaceMode: mode });
+  },
+
+  setDocumentSearchQuery: (query) => set({ documentSearchQuery: query }),
+
+  setCompareDocuments: (docA, docB) => set({ compareDocA: docA, compareDocB: docB }),
+
+  saveConversation: (title) => {
+    const { activeDocId, messages, documents, savedConversations } = get();
+    if (!activeDocId) return null;
+
+    const nextConversation = {
+      id: crypto.randomUUID(),
+      title: title || `Conversation ${savedConversations.length + 1}`,
+      activeDocId,
+      messages: { ...messages },
+      updatedAt: new Date().toISOString(),
+      documentLabel: documents.find((doc) => doc.doc_id === activeDocId)?.title || "Current workspace",
+    };
+
+    const nextConversations = [nextConversation, ...savedConversations].slice(0, 8);
+    writeStoredState("docmind-conversations", nextConversations);
+    set({ savedConversations: nextConversations, activeConversationId: nextConversation.id });
+    return nextConversation;
+  },
+
+  restoreConversation: (id) => {
+    const conversation = get().savedConversations.find((item) => item.id === id);
+    if (!conversation) return null;
+    set({
+      activeConversationId: id,
+      activeDocId: conversation.activeDocId,
+      messages: conversation.messages,
+    });
+    return conversation;
+  },
+
+  renameConversation: (id, title) => {
+    set((state) => {
+      const nextConversations = state.savedConversations.map((item) => (item.id === id ? { ...item, title } : item));
+      writeStoredState("docmind-conversations", nextConversations);
+      return { savedConversations: nextConversations };
+    });
+  },
+
+  deleteConversation: (id) => {
+    set((state) => {
+      const nextConversations = state.savedConversations.filter((item) => item.id !== id);
+      writeStoredState("docmind-conversations", nextConversations);
+      return {
+        savedConversations: nextConversations,
+        activeConversationId: state.activeConversationId === id ? null : state.activeConversationId,
+      };
+    });
+  },
+
+  clearCurrentThread: () => {
+    const { activeDocId } = get();
+    if (!activeDocId) return;
+    set((state) => ({
+      messages: {
+        ...state.messages,
+        [activeDocId]: [],
+      },
+      activeConversationId: null,
+    }));
   },
 
   loadDocuments: async () => {
@@ -30,7 +129,7 @@ export const useStore = create((set, get) => ({
   },
 
   selectDocument: (docId) => {
-    set({ activeDocId: docId });
+    set({ activeDocId: docId, activeConversationId: null });
   },
 
   uploadDocument: async (file) => {

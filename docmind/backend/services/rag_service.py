@@ -63,12 +63,52 @@ class RagService:
             separators=["\n\n", "\n", ". ", " ", ""],
         )
 
+    def get_chat_model(self) -> str:
+        if hasattr(self, "_chat_model"):
+            return self._chat_model
+
+        configured = config.CHAT_MODEL
+        try:
+            url = f"{config.OLLAMA_API_URL.rstrip('/')}/api/tags"
+            headers = {}
+            if config.OLLAMA_API_KEY:
+                headers["Authorization"] = f"Bearer {config.OLLAMA_API_KEY}"
+            resp = httpx.get(url, headers=headers, timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                models = [m["name"] for m in data.get("models", [])]
+                
+                if configured in models:
+                    self._chat_model = configured
+                    return configured
+                if f"{configured}:latest" in models:
+                    self._chat_model = f"{configured}:latest"
+                    return self._chat_model
+                
+                for m in data.get("models", []):
+                    capabilities = m.get("capabilities", [])
+                    if "completion" in capabilities:
+                        self._chat_model = m["name"]
+                        return self._chat_model
+                
+                for m in data.get("models", []):
+                    capabilities = m.get("capabilities", [])
+                    if capabilities != ["embedding"]:
+                        self._chat_model = m["name"]
+                        return self._chat_model
+        except Exception:
+            pass
+
+        self._chat_model = configured
+        return configured
+
     # ------------------------------------------------------------------ #
     # Ingest
     # ------------------------------------------------------------------ #
     def ingest(self, file_bytes: bytes, filename: str) -> DocumentMeta:
-        pages = parse_pdf(file_bytes)
+        pages, has_images = parse_pdf(file_bytes)
         doc_id = uuid.uuid4().hex[:12]
+
 
         chunk_records: List[Dict] = []
         chunk_id = 0
@@ -87,6 +127,8 @@ class RagService:
                 chunk_id += 1
 
         if not chunk_records:
+            if has_images:
+                raise ValueError("This PDF appears to be a scanned image and requires OCR to extract text.")
             raise ValueError("No extractable text found in the PDF.")
 
         texts = [rec["text"] for rec in chunk_records]
@@ -170,7 +212,7 @@ class RagService:
         messages.append({"role": "user", "content": user_content})
 
         payload = {
-            "model": config.CHAT_MODEL,
+            "model": self.get_chat_model(),
             "messages": messages,
             "stream": True,
         }
@@ -178,7 +220,9 @@ class RagService:
         if config.OLLAMA_API_KEY:
             headers["Authorization"] = f"Bearer {config.OLLAMA_API_KEY}"
 
-        url = f"{config.OLLAMA_API_URL.rstrip('/')}/chat/completions"
+        # Determine endpoint based on API URL
+        endpoint = "/chat/completions" if "/v1" in config.OLLAMA_API_URL else "/api/chat"
+        url = f"{config.OLLAMA_API_URL.rstrip('/')}{endpoint}"
         timeout = httpx.Timeout(120.0, connect=30.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream("POST", url, json=payload, headers=headers) as resp:
@@ -279,21 +323,37 @@ class RagService:
 
     def _parse_sse_line(self, line: str) -> Optional[str]:
         line = line.strip()
-        if not line or not line.startswith("data:"):
+        if not line:
             return None
-        data = line[5:].strip()
-        if data == "[DONE]":
-            return None
+
+        data_str = line
+        if line.startswith("data:"):
+            data_str = line[5:].strip()
+            if data_str == "[DONE]":
+                return None
+
         try:
-            obj = json.loads(data)
+            obj = json.loads(data_str)
         except json.JSONDecodeError:
             return None
-        choices = obj.get("choices") or []
-        if not choices:
-            return None
-        delta = choices[0].get("delta") or {}
-        content = delta.get("content")
-        return content or None
+
+        # OpenAI / Compatible format
+        if "choices" in obj:
+            choices = obj.get("choices") or []
+            if not choices:
+                return None
+            delta = choices[0].get("delta") or {}
+            return delta.get("content")
+
+        # Native Ollama chat format
+        if "message" in obj:
+            return obj.get("message", {}).get("content")
+
+        # Native Ollama generate format
+        if "response" in obj:
+            return obj.get("response")
+
+        return None
 
 
 rag_service = RagService()

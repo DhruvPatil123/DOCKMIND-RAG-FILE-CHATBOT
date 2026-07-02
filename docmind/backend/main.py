@@ -99,9 +99,9 @@ async def chat(request: ChatRequest):
                 system_prompt, user_content, [m.model_dump() for m in request.history]
             ):
                 full_text += token
-                yield f"data: {token}\n\n"
+                yield f"data: {json_dumps(token)}\n\n"
         except Exception as exc:
-            yield f"data: [ERROR] {exc}\n\n"
+            yield f"data: [ERROR] {json_dumps(str(exc))}\n\n"
             return
 
         sources_json = json_dumps(sources_payload)

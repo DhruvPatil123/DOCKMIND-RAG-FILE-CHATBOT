@@ -4,14 +4,10 @@ import { useStore } from "../store/useStore";
 import { Upload, FileCheck, FileWarning } from "lucide-react";
 
 export default function UploadZone3D() {
-  const { uploadDocument, processingState } = useStore();
+  const { uploadDocument } = useStore();
   const [isDragging, setIsDragging] = useState(false);
   const [status, setStatus] = useState("idle"); // idle | success | error
   const fileInputRef = useRef(null);
-
-  // Tilt values
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
 
   const mouseX = useSpring(0, { stiffness: 150, damping: 20 });
   const mouseY = useSpring(0, { stiffness: 150, damping: 20 });
@@ -36,9 +32,7 @@ export default function UploadZone3D() {
   }
 
   const handleFile = async (uploadedFile) => {
-    console.log("Processing file:", uploadedFile);
     if (!uploadedFile || !uploadedFile.name.toLowerCase().endsWith(".pdf")) {
-      console.error("Invalid file type. Please upload a PDF.");
       setStatus("error");
       setTimeout(() => setStatus("idle"), 3000);
       return;
@@ -47,21 +41,17 @@ export default function UploadZone3D() {
     setStatus("uploading");
 
     try {
-      console.log("Uploading to backend...");
       await uploadDocument(uploadedFile);
       setStatus("success");
     } catch (e) {
-      console.error("Upload failed:", e);
       setStatus("error");
     } finally {
-      setTimeout(() => {
-        setStatus("idle");
-      }, 3000);
+      setTimeout(() => setStatus("idle"), 3000);
     }
   };
 
   return (
-    <div className="px-4 py-6">
+    <div className="px-4 pb-4 pt-3">
       <input
         type="file"
         ref={fileInputRef}
@@ -72,12 +62,8 @@ export default function UploadZone3D() {
       <motion.div
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        style={{
-          rotateX,
-          rotateY,
-          perspective: 1000,
-        }}
-        className="relative h-48 w-full cursor-pointer"
+        style={{ rotateX, rotateY, perspective: 1000 }}
+        className="relative h-32 w-full cursor-pointer"
       >
         <motion.div
           onDragOver={(e) => {
@@ -94,54 +80,56 @@ export default function UploadZone3D() {
           onClick={() => fileInputRef.current?.click()}
           animate={{
             rotateY: status === "success" || status === "error" ? 180 : 0,
-            scale: isDragging ? 1.05 : 1,
+            scale: isDragging ? 1.03 : 1,
+            boxShadow: isDragging
+              ? "0 0 30px rgba(99,102,241,0.32)"
+              : status === "idle"
+                ? "0 0 25px rgba(99,102,241,0.12)"
+                : "0 0 20px rgba(2,6,23,0.16)",
           }}
           transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          className="h-full w-full cursor-pointer rounded-2xl border-2 border-slate-700 bg-slate-800/40 backdrop-blur-xl p-6 transition-all duration-300 hover:border-indigo-500/50 hover:shadow-[0_0_20px_rgba(79,70,229,0.2)] overflow-hidden"
+          className={`relative h-full w-full overflow-hidden rounded-[1.35rem] border border-slate-700/80 bg-slate-800/45 p-5 backdrop-blur-xl transition-all duration-300 hover:border-indigo-400/50 ${status === "idle" ? "animate-pulse-border" : ""}`}
           style={{ transformStyle: "preserve-3d" }}
         >
-          {/* Front Side */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.18),_transparent_65%)]" />
+
           <div
-            className={`absolute inset-0 p-6 flex flex-col items-center justify-center gap-3 ${status !== "idle" ? "invisible" : "visible"}`}
+            className={`absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 ${status !== "idle" ? "invisible" : "visible"}`}
             style={{ backfaceVisibility: "hidden" }}
           >
-            <div className="p-3 rounded-full bg-indigo-500/10 text-indigo-400">
-              <Upload size={24} />
+            <div className="rounded-full bg-indigo-500/10 p-3 text-indigo-300">
+              <Upload size={22} />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-slate-200">Drop PDF here or click</p>
-              <p className="text-xs text-slate-500">Max 10MB</p>
+              <p className="text-sm font-medium text-slate-100">Drop PDF here or click</p>
+              <p className="mt-1 text-xs text-slate-500">PDFs up to 10MB</p>
             </div>
           </div>
 
-          {/* Back Side */}
           <div
-            className={`absolute inset-0 p-6 flex flex-col items-center justify-center gap-3 ${status === "idle" ? "invisible" : "visible"}`}
-            style={{
-              backfaceVisibility: "hidden",
-              transform: "rotateY(180deg)"
-            }}
+            className={`absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 ${status === "idle" ? "invisible" : "visible"}`}
+            style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
           >
             {status === "success" ? (
               <>
-                <div className="p-3 rounded-full bg-green-500/10 text-green-400">
-                  <FileCheck size={24} />
+                <div className="rounded-full bg-emerald-500/10 p-3 text-emerald-400">
+                  <FileCheck size={22} />
                 </div>
-                <p className="text-sm font-medium text-slate-200">Upload Complete!</p>
+                <p className="text-sm font-medium text-slate-100">Upload complete</p>
               </>
             ) : status === "error" ? (
               <>
-                <div className="p-3 rounded-full bg-red-500/10 text-red-400">
-                  <FileWarning size={24} />
+                <div className="rounded-full bg-red-500/10 p-3 text-red-400">
+                  <FileWarning size={22} />
                 </div>
-                <p className="text-sm font-medium text-slate-200">Invalid File</p>
+                <p className="text-sm font-medium text-slate-100">Invalid file</p>
               </>
             ) : (
               <>
-                <div className="p-3 rounded-full bg-indigo-500/10 text-indigo-400 animate-pulse">
-                  <Upload size={24} />
+                <div className="rounded-full bg-indigo-500/10 p-3 text-indigo-300 animate-pulse">
+                  <Upload size={22} />
                 </div>
-                <p className="text-sm font-medium text-slate-200">Processing...</p>
+                <p className="text-sm font-medium text-slate-100">Processing…</p>
               </>
             )}
           </div>

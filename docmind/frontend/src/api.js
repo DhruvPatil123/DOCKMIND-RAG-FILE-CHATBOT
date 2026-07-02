@@ -43,6 +43,7 @@ export async function streamChat({ docId, message, history, onToken, onSources }
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let currentEvent = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -52,12 +53,14 @@ export async function streamChat({ docId, message, history, onToken, onSources }
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
 
-    let currentEvent = null;
     for (const line of lines) {
       if (line.startsWith("event:")) {
         currentEvent = line.slice(6).trim();
       } else if (line.startsWith("data:")) {
-        const data = line.slice(5).trim();
+        let data = line.slice(5);
+        if (data.startsWith(" ")) {
+          data = data.slice(1);
+        }
         if (data === "[DONE]") continue;
         if (currentEvent === "sources") {
           try {
@@ -67,9 +70,18 @@ export async function streamChat({ docId, message, history, onToken, onSources }
           }
           currentEvent = null;
         } else if (data.startsWith("[ERROR]")) {
-          onToken?.(data);
+          const errPart = data.slice(7).trim();
+          try {
+            onToken?.(`[ERROR] ${JSON.parse(errPart)}`);
+          } catch {
+            onToken?.(data);
+          }
         } else {
-          onToken?.(data);
+          try {
+            onToken?.(JSON.parse(data));
+          } catch {
+            onToken?.(data);
+          }
         }
       }
     }

@@ -2,12 +2,11 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "https://api.ollama.cloud/v1")
+OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "")
 PINECONE_INDEX = os.getenv("PINECONE_INDEX", "")
@@ -30,6 +29,9 @@ USE_PINECONE = bool(PINECONE_API_KEY and PINECONE_INDEX)
 
 CORS_ORIGINS = [
     o.strip()
-    for o in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    for o in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
     if o.strip()
 ]

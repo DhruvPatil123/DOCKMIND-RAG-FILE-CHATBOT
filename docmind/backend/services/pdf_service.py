@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 
 import fitz
 
@@ -10,13 +10,16 @@ class PageText:
     text: str
 
 
-def parse_pdf(file_bytes: bytes) -> List[PageText]:
+def parse_pdf(file_bytes: bytes) -> Tuple[List[PageText], bool]:
     pages: List[PageText] = []
+    has_images = False
     with fitz.open(stream=file_bytes, filetype="pdf") as doc:
         for index, page in enumerate(doc):
             text = page.get_text("text").strip()
+            if not text and len(page.get_images()) > 0:
+                has_images = True
             pages.append(PageText(page_number=index + 1, text=text))
-    return pages
+    return pages, has_images
 
 
 def extract_title(file_bytes: bytes, fallback: str) -> str:

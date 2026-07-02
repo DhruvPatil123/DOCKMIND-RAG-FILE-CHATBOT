@@ -3,6 +3,12 @@ import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
 import { useStore } from "../store/useStore";
 
+const quickPrompts = [
+  "Summarize the key deadlines in this document",
+  "Find risks or exceptions in this file",
+  "What are the most important action items?",
+];
+
 export default function ChatPanel() {
   const activeDocId = useStore((s) => s.activeDocId);
   const documents = useStore((s) => s.documents);
@@ -17,7 +23,7 @@ export default function ChatPanel() {
     <div className="flex h-full flex-col">
       <ChatHeader document={doc} />
       <MessageList messages={messages} />
-      <ChatInput onSend={sendMessage} disabled={!activeDocId || isStreaming} />
+      <ChatInput suggestions={quickPrompts} onSend={sendMessage} disabled={!activeDocId || isStreaming} />
     </div>
   );
 }

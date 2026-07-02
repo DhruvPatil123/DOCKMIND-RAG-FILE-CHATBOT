@@ -1,3 +1,4 @@
+
 ## Plan: DocMind full-stack RAG chatbot
 
 Build a complete React + Vite frontend with Tailwind and Framer Motion, and a FastAPI backend that ingests PDFs, builds a FAISS-backed RAG index, and streams Ollama Cloud responses with citations.
